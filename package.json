@@ -1,0 +1,13 @@
+{
+  "name": "sql-injection-demo",
+  "version": "1.0.0",
+  "description": "A tiny web app to demo SQL Injection in 1-2 minutes during a presentation.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "express": "^4.19.2"
+  }
+}

@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>SQL Injection — Live Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>🛡️ SQL Injection — Live Demo</h1>
+    <nav>
+      <a href="index.html" class="active">Demo</a>
+      <a href="explain.html">How it works</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Try logging in</h2>
+      <p class="hint">
+        Legit users: <code>alice / wonderland</code>, <code>bob / builder123</code>.
+        Admin password is secret 🤫
+      </p>
+
+      <form id="loginForm">
+        <label>Username
+          <input id="username" name="username" autocomplete="off" />
+        </label>
+        <label>Password
+          <input id="password" name="password" autocomplete="off" />
+        </label>
+
+        <fieldset class="mode">
+          <legend>Backend mode</legend>
+          <label><input type="radio" name="mode" value="vulnerable" checked> 🔥 Vulnerable (string concat)</label>
+          <label><input type="radio" name="mode" value="safe"> ✅ Safe (parameterized)</label>
+        </fieldset>
+
+        <button type="submit">Log in</button>
+      </form>
+
+      <div class="payloads">
+        <strong>One-click attack payloads:</strong>
+        <button type="button" data-u="' OR '1'='1' -- " data-p="anything">Bypass with <code>' OR '1'='1' --</code></button>
+        <button type="button" data-u="admin' -- " data-p="whatever">Login as admin <code>admin' --</code></button>
+        <button type="button" data-u="alice" data-p="wonderland">Normal login (alice)</button>
+      </div>
+    </section>
+
+    <section class="card" id="resultCard" hidden>
+      <h2>Result</h2>
+      <div id="status"></div>
+
+      <div id="explainBox" hidden>
+        <h3>🛡️ What just happened?</h3>
+        <div id="explainBody"></div>
+      </div>
+
+      <h3>SQL the server actually ran</h3>
+      <pre id="sqlOut"></pre>
+      <h3>Parameters sent separately</h3>
+      <pre id="paramsOut"></pre>
+      <h3>Full response</h3>
+      <pre id="jsonOut"></pre>
+    </section>
+  </main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script>
+const form = document.getElementById('loginForm');
+const u = document.getElementById('username');
+const p = document.getElementById('password');
+
+document.querySelectorAll('.payloads button').forEach(b => {
+  b.addEventListener('click', () => {
+    u.value = b.dataset.u;
+    p.value = b.dataset.p;
+  });
+});
+
+// ---- Run SQLite right here in the browser (works on GitHub Pages) ----
+let dbReady = (async () => {
+  const SQL = await initSqlJs({
+    locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${f}`
+  });
+  const db = new SQL.Database();
+  db.run(`
+    CREATE TABLE users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      role TEXT NOT NULL,
+      secret TEXT NOT NULL
+    );
+    INSERT INTO users (username, password, role, secret) VALUES
+      ('alice', 'wonderland',  'user',  'Alice''s diary: I love rabbits.'),
+      ('bob',   'builder123',  'user',  'Bob''s notes: meeting at 3pm.'),
+      ('admin', 'sup3rS3cret!','admin', 'TOP SECRET: launch codes = 0000.');
+  `);
+  return db;
+})();
+
+function rowFromExec(res) {
+  if (!res.length || !res[0].values.length) return null;
+  const cols = res[0].columns;
+  const vals = res[0].values[0];
+  return Object.fromEntries(cols.map((c, i) => [c, vals[i]]));
+}
+
+async function loginVulnerable(username, password) {
+  const db = await dbReady;
+  // !! INTENTIONALLY INSECURE - string concatenation !!
+  const sql = `SELECT id, username, role, secret FROM users
+               WHERE username = '${username}' AND password = '${password}'`;
+  try {
+    const row = rowFromExec(db.exec(sql));
+    return { sql, success: !!row, user: row };
+  } catch (err) {
+    return { sql, success: false, error: err.message };
+  }
+}
+
+async function loginSafe(username, password) {
+  const db = await dbReady;
+  const sql = "SELECT id, username, role, secret FROM users WHERE username = ? AND password = ?";
+  try {
+    const stmt = db.prepare(sql);
+    stmt.bind([username, password]);
+    const row = stmt.step() ? stmt.getAsObject() : null;
+    stmt.free();
+    return { sql, params: [username, password], success: !!row, user: row };
+  } catch (err) {
+    return { sql, success: false, error: err.message };
+  }
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const mode = document.querySelector('input[name=mode]:checked').value;
+  const data = mode === 'safe'
+    ? await loginSafe(u.value, p.value)
+    : await loginVulnerable(u.value, p.value);
+
+  document.getElementById('resultCard').hidden = false;
+  const status = document.getElementById('status');
+  if (data.success) {
+    status.className = data.user.role === 'admin' ? 'ok admin' : 'ok';
+    status.textContent =
+      (data.user.role === 'admin'
+        ? '🚨 BREACH — Attacker is now logged in as '
+        : '✅ Logged in as ') +
+      data.user.username + ' (' + data.user.role + '). Secret: ' + data.user.secret;
+  } else {
+    status.className = 'fail';
+    status.textContent = '❌ Login failed' + (data.error ? ' — ' + data.error : '');
+  }
+  document.getElementById('sqlOut').textContent = data.sql;
+
+  // Parameters block (only meaningful in safe mode)
+  const paramsOut = document.getElementById('paramsOut');
+  if (data.params) {
+    paramsOut.parentElement.style.display = '';
+    paramsOut.previousElementSibling.style.display = '';
+    paramsOut.textContent = JSON.stringify(data.params, null, 2);
+  } else {
+    paramsOut.parentElement.style.display = 'none';
+    paramsOut.previousElementSibling.style.display = 'none';
+  }
+
+  // Educational explanation box
+  const explainBox = document.getElementById('explainBox');
+  const explainBody = document.getElementById('explainBody');
+  explainBox.hidden = false;
+  if (mode === 'safe') {
+    const looksLikeAttack = /['"]|--|\bOR\b/i.test(u.value) || /['"]|--|\bOR\b/i.test(p.value);
+    explainBody.innerHTML = `
+      <p><strong>You used a parameterized query.</strong> The app sent the SQL <em>template</em> and your input as <em>separate</em> values to the database:</p>
+      <pre class="good">SQL template:
+SELECT id, username, role, secret
+FROM users WHERE username = ? AND password = ?
+
+Values:
+username = ${JSON.stringify(u.value)}
+password = ${JSON.stringify(p.value)}</pre>
+      <p>The database compiles the template <strong>first</strong>, then plugs in the values as plain data. Even characters like <code>'</code>, <code>--</code>, or <code>OR 1=1</code> are treated as part of the username string — they can never become SQL code.</p>
+      ${looksLikeAttack
+        ? `<p>🛡️ Your input looked like an injection attempt (<code>${escapeHtml(u.value)}</code>), but here it was just compared literally against the <code>username</code> column. No row matched, so login failed — exactly as it should.</p>`
+        : (data.success
+            ? `<p>✅ Your input matched a real user, so login succeeded normally. Parameterization doesn't block legitimate logins — it just removes the attacker's ability to inject SQL.</p>`
+            : `<p>The credentials simply didn't match any user. Parameterization didn't reject it — the data did.</p>`)
+      }
+      <p class="hint">👉 Now flip back to <strong>🔥 Vulnerable</strong> and try the same input — same payload, very different outcome.</p>
+    `;
+  } else {
+    if (data.success && data.user.role === 'admin') {
+      explainBody.innerHTML = `
+        <p><strong>The app built one big SQL string by concatenating your input.</strong> Your <code>--</code> turned the password check into a comment, so the database only saw:</p>
+        <pre class="bad">SELECT ... WHERE username = 'admin'</pre>
+        <p>That matched the admin row → attacker is in. No password needed. 💥</p>
+        <p class="hint">👉 Switch to <strong>✅ Safe (parameterized)</strong> and try the same payload to see it neutralized.</p>
+      `;
+    } else if (data.success) {
+      explainBody.innerHTML = `<p>Normal login — the SQL string happened to match a real user. Try an injection payload (the purple buttons) to see how the same code can be abused.</p>`;
+    } else {
+      explainBody.innerHTML = `<p>This payload didn't match a row. Tip: <code>AND</code> binds tighter than <code>OR</code>, so attackers usually end with <code>--</code> to comment out the password check. Try <code>admin' --</code>.</p>`;
+    }
+  }
+
+  document.getElementById('jsonOut').textContent = JSON.stringify(data, null, 2);
+});
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'
+  }[c]));
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>How SQL Injection works</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>🧠 How SQL Injection works</h1>
+    <nav>
+      <a href="index.html">Demo</a>
+      <a href="explain.html" class="active">How it works</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>1. The normal flow</h2>
+      <div class="diagram">
+        <div class="box user">👤 User<br/><small>alice / wonderland</small></div>
+        <div class="arrow">→</div>
+        <div class="box app">🖥️ Web App</div>
+        <div class="arrow">→</div>
+        <div class="box db">🗄️ Database</div>
+      </div>
+      <pre class="good">SELECT * FROM users
+WHERE username = 'alice' AND password = 'wonderland';</pre>
+      <p>One row matches → user is logged in. Everyone is happy.</p>
+    </section>
+
+    <section class="card">
+      <h2>2. The attack: input becomes code</h2>
+      <p>The vulnerable server <em>concatenates</em> user input straight into SQL:</p>
+      <pre>"SELECT * FROM users WHERE username = '" + <span class="bad">input</span> + "' AND password = '" + <span class="bad">input</span> + "'"</pre>
+
+      <p>Attacker types this in the username field:</p>
+      <pre class="bad">' OR '1'='1' --</pre>
+
+      <p>The server happily builds:</p>
+      <pre class="bad">SELECT * FROM users
+WHERE username = '' OR '1'='1' --' AND password = 'anything';</pre>
+
+      <p>The <code>--</code> turns the rest of the line into a comment, so the password check is gone. <code>'1'='1'</code> is always true → the WHERE clause matches the first row → attacker is logged in, often as <strong>admin</strong>. 💥</p>
+
+      <div class="diagram">
+        <div class="box user evil">😈 Attacker<br/><small>' OR '1'='1' --</small></div>
+        <div class="arrow">→</div>
+        <div class="box app warn">🖥️ Web App<br/><small>concatenates string</small></div>
+        <div class="arrow">→</div>
+        <div class="box db danger">🗄️ DB returns<br/><small>admin row</small></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3. Why it works — the mental model</h2>
+      <div class="split">
+        <div>
+          <h3>❌ Concatenation</h3>
+          <p>Data and code share the same string. The DB can't tell them apart.</p>
+          <pre class="bad">"... WHERE username = '" + input + "'"</pre>
+          <p><em>Input can break out of the quotes and inject new SQL.</em></p>
+        </div>
+        <div>
+          <h3>✅ Parameterized query</h3>
+          <p>Code is sent first, data is sent separately. Input is <strong>always</strong> treated as a value.</p>
+          <pre class="good">"... WHERE username = ? AND password = ?"
+params: [input1, input2]</pre>
+          <p><em>No matter what the user types, it can never become SQL.</em></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>4. Defense checklist</h2>
+      <ul class="check">
+        <li>✅ Use <strong>parameterized queries</strong> / prepared statements (always).</li>
+        <li>✅ Use an ORM that parameterizes by default.</li>
+        <li>✅ Apply <strong>least privilege</strong> on the DB account.</li>
+        <li>✅ Validate &amp; allow-list input where it makes sense.</li>
+        <li>✅ Add a <strong>WAF</strong> as defense-in-depth — but never as the only defense.</li>
+        <li>❌ Don't try to "escape" or blacklist characters yourself.</li>
+      </ul>
+    </section>
+
+    <p class="cta"><a href="index.html">← Back to live demo</a></p>
+  </main>
+</body>
+</html>

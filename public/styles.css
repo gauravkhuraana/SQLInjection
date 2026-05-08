@@ -1,0 +1,116 @@
+* { box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+  margin: 0; background: #0f172a; color: #e2e8f0;
+}
+header {
+  padding: 1.2rem 2rem; background: #1e293b;
+  border-bottom: 2px solid #334155;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 1rem;
+}
+header h1 { margin: 0; font-size: 1.4rem; }
+nav a {
+  color: #93c5fd; text-decoration: none; margin-left: 1rem;
+  padding: .35rem .75rem; border-radius: 6px;
+}
+nav a.active, nav a:hover { background: #334155; color: #fff; }
+
+main { max-width: 880px; margin: 1.5rem auto; padding: 0 1rem; }
+
+.card {
+  background: #1e293b; border: 1px solid #334155;
+  border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 1.25rem;
+  box-shadow: 0 4px 14px rgba(0,0,0,.25);
+}
+.card h2 { margin-top: 0; color: #f8fafc; }
+.hint { color: #94a3b8; font-size: .92rem; }
+
+form label { display: block; margin: .6rem 0; }
+form input[type=text], form input:not([type]) {
+  width: 100%;
+}
+input[type=text], input:not([type=radio]):not([type=checkbox]) {
+  padding: .55rem .7rem; border-radius: 6px; border: 1px solid #475569;
+  background: #0f172a; color: #e2e8f0; font-family: inherit; width: 100%;
+}
+.mode { border: 1px dashed #475569; padding: .5rem 1rem; border-radius: 8px; margin: .8rem 0; }
+.mode legend { padding: 0 .4rem; color: #cbd5e1; }
+.mode label { display: inline-block; margin-right: 1rem; }
+
+button {
+  background: #2563eb; color: #fff; border: 0; padding: .55rem 1rem;
+  border-radius: 6px; font-weight: 600; cursor: pointer; margin-top: .4rem;
+}
+button:hover { background: #1d4ed8; }
+
+.payloads { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #334155; }
+.payloads button { background: #7c3aed; margin: .25rem .35rem .25rem 0; }
+.payloads button:hover { background: #6d28d9; }
+.payloads code { background: #0f172a; padding: .1rem .35rem; border-radius: 4px; }
+
+pre {
+  background: #0b1220; border: 1px solid #334155; padding: .85rem 1rem;
+  border-radius: 8px; overflow-x: auto; white-space: pre-wrap; word-break: break-word;
+  color: #e2e8f0;
+}
+pre.good { border-left: 4px solid #22c55e; }
+pre.bad  { border-left: 4px solid #ef4444; }
+.bad { color: #fca5a5; }
+.good { color: #86efac; }
+
+#status { padding: .6rem .8rem; border-radius: 6px; font-weight: 600; }
+#status.ok    { background: #064e3b; color: #d1fae5; }
+#status.admin {
+  background: linear-gradient(90deg, #b45309, #f59e0b);
+  color: #1c1917;
+  border: 2px solid #fbbf24;
+  box-shadow: 0 0 0 3px rgba(251,191,36,.25);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(251,191,36,.25); }
+  50%      { box-shadow: 0 0 0 8px rgba(251,191,36,.10); }
+}
+#status.fail  {
+  background: #450a0a; color: #fecaca;
+  border: 1px solid #ef4444;
+}
+
+.diagram {
+  display: flex; align-items: center; justify-content: center;
+  gap: .75rem; flex-wrap: wrap; margin: 1rem 0;
+}
+.box {
+  background: #0f172a; border: 2px solid #475569;
+  padding: .9rem 1rem; border-radius: 10px; min-width: 130px; text-align: center;
+}
+.box.user { border-color: #38bdf8; }
+.box.app  { border-color: #a78bfa; }
+.box.db   { border-color: #34d399; }
+.box.evil   { border-color: #ef4444; background: #450a0a; }
+.box.warn   { border-color: #f59e0b; background: #451a03; }
+.box.danger { border-color: #ef4444; background: #450a0a; }
+.arrow { font-size: 1.6rem; color: #94a3b8; }
+
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.split > div { background: #0f172a; padding: 1rem; border-radius: 8px; border: 1px solid #334155; }
+@media (max-width: 720px) { .split { grid-template-columns: 1fr; } }
+
+.check { line-height: 1.7; }
+.cta { text-align: center; margin: 2rem 0; }
+.cta a { color: #93c5fd; }
+
+#explainBox {
+  margin-top: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 8px;
+  background: #0b2545;
+  border-left: 4px solid #38bdf8;
+}
+#explainBox h3 { margin-top: 0; color: #bae6fd; }
+#explainBox p { margin: .5rem 0; line-height: 1.5; }
+#explainBox code {
+  background: #0f172a; padding: .1rem .35rem;
+  border-radius: 4px; color: #fde68a;
+}

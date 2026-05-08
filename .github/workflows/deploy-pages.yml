@@ -1,0 +1,47 @@
+name: Deploy SQL Injection demo to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # If you keep this app inside a larger repo, set this to the subfolder
+      # that contains the `public/` directory (e.g. "SQLInjection").
+      # Leave blank if `public/` is at the repo root.
+      - name: Stage site
+        run: |
+          mkdir -p _site
+          cp -r public/* _site/
+          # Optional: custom domain. Uncomment and set if you serve this app
+          # at the apex of gauravkhurana.com instead of a subpath.
+          # echo "gauravkhurana.com" > _site/CNAME
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
