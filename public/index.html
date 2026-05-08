@@ -22,6 +22,7 @@
         Legit users: <code>alice / wonderland</code>, <code>bob / builder123</code>.
         Admin password is secret 🤫
       </p>
+      <p id="dbStatus" class="db-status loading">⏳ Loading in-browser SQLite (WebAssembly)…</p>
 
       <form id="loginForm">
         <label>Username
@@ -66,11 +67,13 @@
     </section>
   </main>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"
+        onerror="document.getElementById('dbStatus').textContent='❌ Failed to load sql.js from CDN. Check network/ad-blocker.';document.getElementById('dbStatus').className='db-status fail';"></script>
 <script>
 const form = document.getElementById('loginForm');
 const u = document.getElementById('username');
 const p = document.getElementById('password');
+const dbStatusEl = document.getElementById('dbStatus');
 
 document.querySelectorAll('.payloads button').forEach(b => {
   b.addEventListener('click', () => {
@@ -81,6 +84,9 @@ document.querySelectorAll('.payloads button').forEach(b => {
 
 // ---- Run SQLite right here in the browser (works on GitHub Pages) ----
 let dbReady = (async () => {
+  if (typeof initSqlJs !== 'function') {
+    throw new Error('sql.js failed to load. Check that https://cdnjs.cloudflare.com is reachable.');
+  }
   const SQL = await initSqlJs({
     locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${f}`
   });
@@ -100,6 +106,14 @@ let dbReady = (async () => {
   `);
   return db;
 })();
+
+dbReady.then(() => {
+  dbStatusEl.textContent = '✅ In-browser SQLite ready. Try a login below.';
+  dbStatusEl.className = 'db-status ok';
+}).catch(err => {
+  dbStatusEl.textContent = '❌ ' + err.message;
+  dbStatusEl.className = 'db-status fail';
+});
 
 function rowFromExec(res) {
   if (!res.length || !res[0].values.length) return null;
@@ -137,13 +151,22 @@ async function loginSafe(username, password) {
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const mode = document.querySelector('input[name=mode]:checked').value;
-  const data = mode === 'safe'
-    ? await loginSafe(u.value, p.value)
-    : await loginVulnerable(u.value, p.value);
-
-  document.getElementById('resultCard').hidden = false;
   const status = document.getElementById('status');
+  document.getElementById('resultCard').hidden = false;
+  let data;
+  try {
+    const mode = document.querySelector('input[name=mode]:checked').value;
+    data = mode === 'safe'
+      ? await loginSafe(u.value, p.value)
+      : await loginVulnerable(u.value, p.value);
+  } catch (err) {
+    status.className = 'fail';
+    status.textContent = '❌ JavaScript error: ' + err.message;
+    document.getElementById('sqlOut').textContent = '(no SQL ran)';
+    document.getElementById('jsonOut').textContent = String(err.stack || err);
+    return;
+  }
+  const mode = document.querySelector('input[name=mode]:checked').value;
   if (data.success) {
     status.className = data.user.role === 'admin' ? 'ok admin' : 'ok';
     status.textContent =

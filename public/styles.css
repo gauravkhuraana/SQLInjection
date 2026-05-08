@@ -26,6 +26,17 @@ main { max-width: 880px; margin: 1.5rem auto; padding: 0 1rem; }
 .card h2 { margin-top: 0; color: #f8fafc; }
 .hint { color: #94a3b8; font-size: .92rem; }
 
+.db-status {
+  margin: .25rem 0 .9rem;
+  padding: .45rem .7rem;
+  border-radius: 6px;
+  font-size: .9rem;
+  border: 1px solid #334155;
+}
+.db-status.loading { background: #1e293b; color: #fde68a; }
+.db-status.ok      { background: #064e3b; color: #d1fae5; border-color: #065f46; }
+.db-status.fail    { background: #450a0a; color: #fecaca; border-color: #ef4444; }
+
 form label { display: block; margin: .6rem 0; }
 form input[type=text], form input:not([type]) {
   width: 100%;
