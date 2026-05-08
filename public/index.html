@@ -182,13 +182,14 @@ form.addEventListener('submit', async (e) => {
 
   // Parameters block (only meaningful in safe mode)
   const paramsOut = document.getElementById('paramsOut');
+  const paramsHeading = paramsOut.previousElementSibling; // the <h3>
   if (data.params) {
-    paramsOut.parentElement.style.display = '';
-    paramsOut.previousElementSibling.style.display = '';
+    paramsOut.style.display = '';
+    paramsHeading.style.display = '';
     paramsOut.textContent = JSON.stringify(data.params, null, 2);
   } else {
-    paramsOut.parentElement.style.display = 'none';
-    paramsOut.previousElementSibling.style.display = 'none';
+    paramsOut.style.display = 'none';
+    paramsHeading.style.display = 'none';
   }
 
   // Educational explanation box
