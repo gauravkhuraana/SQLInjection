@@ -125,3 +125,14 @@ pre.bad  { border-left: 4px solid #ef4444; }
   background: #0f172a; padding: .1rem .35rem;
   border-radius: 4px; color: #fde68a;
 }
+
+.site-footer {
+  margin-top: 2.5rem;
+  padding: 1.2rem 0 2rem;
+  border-top: 1px solid #334155;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+.site-footer a { color: #93c5fd; text-decoration: none; }
+.site-footer a:hover { text-decoration: underline; }

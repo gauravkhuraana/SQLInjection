@@ -31,33 +31,10 @@ Open http://localhost:3000
 
 The `public/` folder is fully static — SQLite runs in the browser via `sql.js`.
 
-1. Push this folder to a GitHub repo (e.g. `gauravkhurana/sql-injection-demo`).
+1. Push this folder to a GitHub repo (e.g. `<your-username>/sql-injection-demo`).
 2. In the repo: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 3. The workflow at `.github/workflows/deploy-pages.yml` publishes `public/` on every push to `main`.
 4. The site will be available at `https://<username>.github.io/<repo>/`.
-
-### Hosting on `gauravkhurana.com`
-
-**Option A — As a sub-path (simplest).** Push this as its own repo
-(e.g. `sql-injection-demo`). Then link to it from your main site at
-`https://gauravkhurana.com/sql-injection-demo/` (either by deploying it
-as a project Pages site under the same GitHub user, or by copying the
-built `public/` folder into a `sql-injection-demo/` folder inside your
-`gauravkhurana.github.io` repo).
-
-**Option B — At the domain root.** If you want this app to *be*
-`gauravkhurana.com`, edit `.github/workflows/deploy-pages.yml` and
-uncomment the `CNAME` line:
-
-```yaml
-echo "gauravkhurana.com" > _site/CNAME
-```
-
-Then point `gauravkhurana.com` DNS at GitHub Pages
-(`A` records: `185.199.108.153`, `185.199.109.153`, `185.199.110.153`,
-`185.199.111.153`, or a `CNAME` to `<username>.github.io`).
-
-> ⚠️ Only one repo can claim the same custom domain at a time.
 
 ## Suggested 90-second script
 
