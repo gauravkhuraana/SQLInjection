@@ -25,11 +25,11 @@
       <p id="dbStatus" class="db-status loading">⏳ Loading in-browser SQLite (WebAssembly)…</p>
 
       <form id="loginForm">
-        <label>Username
-          <input id="username" name="username" autocomplete="off" />
+        <label for="username">Username
+          <input id="username" name="username" type="text" autocomplete="off" />
         </label>
-        <label>Password
-          <input id="password" name="password" autocomplete="off" />
+        <label for="password">Password
+          <input id="password" name="password" type="password" autocomplete="off" />
         </label>
 
         <fieldset class="mode">
@@ -38,14 +38,19 @@
           <label><input type="radio" name="mode" value="safe"> ✅ Safe (parameterized)</label>
         </fieldset>
 
-        <button type="submit">Log in</button>
+        <div class="form-buttons">
+          <button type="submit">Log in</button>
+          <button type="button" id="resetBtn" class="secondary">Reset demo</button>
+        </div>
       </form>
 
       <div class="payloads">
         <strong>One-click attack payloads:</strong>
-        <button type="button" data-u="' OR '1'='1' -- " data-p="anything">Bypass with <code>' OR '1'='1' --</code></button>
-        <button type="button" data-u="admin' -- " data-p="whatever">Login as admin <code>admin' --</code></button>
         <button type="button" data-u="alice" data-p="wonderland">Normal login (alice)</button>
+        <button type="button" data-u="' OR '1'='1' -- " data-p="anything">Bypass <code>' OR '1'='1' --</code></button>
+        <button type="button" data-u="admin' -- " data-p="whatever">Login as admin <code>admin' --</code></button>
+        <button type="button" data-u="' UNION SELECT id, username, password, secret FROM users -- " data-p="x" class="danger">💀 Steal all passwords <code>UNION SELECT</code></button>
+        <button type="button" data-u="'; UPDATE users SET password='pwn3d' WHERE username='admin'; -- " data-p="x" class="danger">🔧 Tamper data <code>; UPDATE …</code></button>
       </div>
     </section>
 
@@ -58,12 +63,28 @@
         <div id="explainBody"></div>
       </div>
 
-      <h3>SQL the server actually ran</h3>
+      <div class="sql-header">
+        <h3>SQL the database actually ran</h3>
+        <button type="button" id="copySqlBtn" class="secondary small">📋 Copy SQL</button>
+      </div>
       <pre id="sqlOut"></pre>
-      <h3>Parameters sent separately</h3>
+
+      <h3 id="paramsHeading">Parameters sent separately</h3>
       <pre id="paramsOut"></pre>
-      <h3>Full response</h3>
-      <pre id="jsonOut"></pre>
+
+      <h3>Rows returned</h3>
+      <div id="rowsOut"></div>
+
+      <details>
+        <summary>Full response JSON</summary>
+        <pre id="jsonOut"></pre>
+      </details>
+    </section>
+
+    <section class="card" id="dbStateCard" hidden>
+      <h2>📊 Current state of the <code>users</code> table</h2>
+      <p class="hint">Watch this after each attack. UNION attacks <em>read</em> rows; <code>;</code>-stacked attacks <em>change</em> them.</p>
+      <div id="dbStateTable"></div>
     </section>
 
     <footer class="site-footer">
@@ -72,7 +93,9 @@
   </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"
-        onerror="document.getElementById('dbStatus').textContent='❌ Failed to load sql.js from CDN. Check network/ad-blocker.';document.getElementById('dbStatus').className='db-status fail';"></script>
+        integrity="sha384-8D3Rsfo535FqoC1pHCCQMrNf75UgzyoG/HQm9zOzITRrz3QKzecc2E7JXKGCXoWu"
+        crossorigin="anonymous"
+        onerror="document.getElementById('dbStatus').textContent='❌ Failed to load sql.js from CDN (check network/ad-blocker, or SRI mismatch).';document.getElementById('dbStatus').className='db-status fail';"></script>
 <script>
 const form = document.getElementById('loginForm');
 const u = document.getElementById('username');
@@ -86,8 +109,31 @@ document.querySelectorAll('.payloads button').forEach(b => {
   });
 });
 
-// ---- Run SQLite right here in the browser (works on GitHub Pages) ----
-let dbReady = (async () => {
+document.getElementById('resetBtn').addEventListener('click', () => {
+  dbReady = buildDb();
+  dbReady.then(() => {
+    dbStatusEl.textContent = '✅ Database reset. Try a login below.';
+    dbStatusEl.className = 'db-status ok';
+    document.getElementById('resultCard').hidden = true;
+    document.getElementById('dbStateCard').hidden = true;
+    u.value = '';
+    p.value = '';
+  });
+});
+
+document.getElementById('copySqlBtn').addEventListener('click', async () => {
+  const txt = document.getElementById('sqlOut').textContent;
+  try {
+    await navigator.clipboard.writeText(txt);
+    const btn = document.getElementById('copySqlBtn');
+    const old = btn.textContent;
+    btn.textContent = '✅ Copied';
+    setTimeout(() => { btn.textContent = old; }, 1200);
+  } catch {}
+});
+
+// ---- Build (or rebuild) the in-browser SQLite DB ----
+async function buildDb() {
   if (typeof initSqlJs !== 'function') {
     throw new Error('sql.js failed to load. Check that https://cdnjs.cloudflare.com is reachable.');
   }
@@ -109,7 +155,9 @@ let dbReady = (async () => {
       ('admin', 'sup3rS3cret!','admin', 'TOP SECRET: launch codes = 0000.');
   `);
   return db;
-})();
+}
+
+let dbReady = buildDb();
 
 dbReady.then(() => {
   dbStatusEl.textContent = '✅ In-browser SQLite ready. Try a login below.';
@@ -119,11 +167,12 @@ dbReady.then(() => {
   dbStatusEl.className = 'db-status fail';
 });
 
-function rowFromExec(res) {
-  if (!res.length || !res[0].values.length) return null;
+function rowsFromExec(res) {
+  if (!res.length || !res[0].values.length) return [];
   const cols = res[0].columns;
-  const vals = res[0].values[0];
-  return Object.fromEntries(cols.map((c, i) => [c, vals[i]]));
+  return res[0].values.map(vals =>
+    Object.fromEntries(cols.map((c, i) => [c, vals[i]]))
+  );
 }
 
 async function loginVulnerable(username, password) {
@@ -132,10 +181,10 @@ async function loginVulnerable(username, password) {
   const sql = `SELECT id, username, role, secret FROM users
                WHERE username = '${username}' AND password = '${password}'`;
   try {
-    const row = rowFromExec(db.exec(sql));
-    return { sql, success: !!row, user: row };
+    const rows = rowsFromExec(db.exec(sql));
+    return { sql, success: rows.length > 0, rows, user: rows[0] || null };
   } catch (err) {
-    return { sql, success: false, error: err.message };
+    return { sql, success: false, error: err.message, rows: [] };
   }
 }
 
@@ -145,12 +194,34 @@ async function loginSafe(username, password) {
   try {
     const stmt = db.prepare(sql);
     stmt.bind([username, password]);
-    const row = stmt.step() ? stmt.getAsObject() : null;
+    const rows = [];
+    while (stmt.step()) rows.push(stmt.getAsObject());
     stmt.free();
-    return { sql, params: [username, password], success: !!row, user: row };
+    return { sql, params: [username, password], success: rows.length > 0, rows, user: rows[0] || null };
   } catch (err) {
-    return { sql, success: false, error: err.message };
+    return { sql, success: false, error: err.message, rows: [] };
   }
+}
+
+async function renderDbState() {
+  const db = await dbReady;
+  try {
+    const rows = rowsFromExec(db.exec('SELECT id, username, password, role FROM users ORDER BY id'));
+    document.getElementById('dbStateCard').hidden = false;
+    document.getElementById('dbStateTable').innerHTML = renderTable(rows, ['id', 'username', 'password', 'role']);
+  } catch (err) {
+    document.getElementById('dbStateCard').hidden = false;
+    document.getElementById('dbStateTable').innerHTML = '<p class="fail-text">❌ Table missing — an attacker may have dropped it. Click <em>Reset demo</em>.</p>';
+  }
+}
+
+function renderTable(rows, cols) {
+  if (!rows.length) return '<p class="hint">(no rows)</p>';
+  const head = '<tr>' + cols.map(c => `<th>${escapeHtml(c)}</th>`).join('') + '</tr>';
+  const body = rows.map(r =>
+    '<tr>' + cols.map(c => `<td>${escapeHtml(String(r[c] ?? ''))}</td>`).join('') + '</tr>'
+  ).join('');
+  return `<table class="data-table"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
 
 form.addEventListener('submit', async (e) => {
@@ -158,8 +229,8 @@ form.addEventListener('submit', async (e) => {
   const status = document.getElementById('status');
   document.getElementById('resultCard').hidden = false;
   let data;
+  const mode = document.querySelector('input[name=mode]:checked').value;
   try {
-    const mode = document.querySelector('input[name=mode]:checked').value;
     data = mode === 'safe'
       ? await loginSafe(u.value, p.value)
       : await loginVulnerable(u.value, p.value);
@@ -170,23 +241,32 @@ form.addEventListener('submit', async (e) => {
     document.getElementById('jsonOut').textContent = String(err.stack || err);
     return;
   }
-  const mode = document.querySelector('input[name=mode]:checked').value;
+
+  // ---- status banner ----
   if (data.success) {
-    status.className = data.user.role === 'admin' ? 'ok admin' : 'ok';
-    status.textContent =
-      (data.user.role === 'admin'
-        ? '🚨 BREACH — Attacker is now logged in as '
-        : '✅ Logged in as ') +
-      data.user.username + ' (' + data.user.role + '). Secret: ' + data.user.secret;
+    const multi = data.rows.length > 1;
+    if (multi) {
+      status.className = 'fail breach';
+      status.textContent = `💀 DATA LEAK — ${data.rows.length} rows returned. The attacker just dumped your users table.`;
+    } else if (data.user.role === 'admin') {
+      status.className = 'ok admin';
+      status.textContent = '🚨 BREACH — Attacker is now logged in as ' +
+        data.user.username + ' (' + data.user.role + '). Secret: ' + data.user.secret;
+    } else {
+      status.className = 'ok';
+      status.textContent = '✅ Logged in as ' + data.user.username + ' (' + data.user.role + ').';
+    }
   } else {
     status.className = 'fail';
     status.textContent = '❌ Login failed' + (data.error ? ' — ' + data.error : '');
   }
+
+  // ---- SQL block ----
   document.getElementById('sqlOut').textContent = data.sql;
 
-  // Parameters block (only meaningful in safe mode)
+  // ---- Params (only safe mode) ----
   const paramsOut = document.getElementById('paramsOut');
-  const paramsHeading = paramsOut.previousElementSibling; // the <h3>
+  const paramsHeading = document.getElementById('paramsHeading');
   if (data.params) {
     paramsOut.style.display = '';
     paramsHeading.style.display = '';
@@ -196,14 +276,31 @@ form.addEventListener('submit', async (e) => {
     paramsHeading.style.display = 'none';
   }
 
-  // Educational explanation box
+  // ---- Rows table ----
+  document.getElementById('rowsOut').innerHTML = data.rows.length
+    ? renderTable(data.rows, Object.keys(data.rows[0]))
+    : '<p class="hint">(no rows)</p>';
+
+  // ---- Explanation ----
   const explainBox = document.getElementById('explainBox');
   const explainBody = document.getElementById('explainBody');
   explainBox.hidden = false;
+  explainBody.innerHTML = buildExplanation(mode, data);
+
+  // ---- Always show DB state — makes tampering visible ----
+  await renderDbState();
+
+  document.getElementById('jsonOut').textContent = JSON.stringify(data, null, 2);
+});
+
+function buildExplanation(mode, data) {
+  const looksLikeUnion = /\bUNION\b/i.test(u.value);
+  const looksLikeStacked = /;\s*\w/.test(u.value);
+  const looksLikeAttack = /['"]|--|\bOR\b/i.test(u.value) || /['"]|--|\bOR\b/i.test(p.value);
+
   if (mode === 'safe') {
-    const looksLikeAttack = /['"]|--|\bOR\b/i.test(u.value) || /['"]|--|\bOR\b/i.test(p.value);
-    explainBody.innerHTML = `
-      <p><strong>You used a parameterized query.</strong> The app sent the SQL <em>template</em> and your input as <em>separate</em> values to the database:</p>
+    return `
+      <p><strong>You used a parameterized query.</strong> The app sent the SQL <em>template</em> and your input as <em>separate</em> values:</p>
       <pre class="good">SQL template:
 SELECT id, username, role, secret
 FROM users WHERE username = ? AND password = ?
@@ -211,32 +308,50 @@ FROM users WHERE username = ? AND password = ?
 Values:
 username = ${JSON.stringify(u.value)}
 password = ${JSON.stringify(p.value)}</pre>
-      <p>The database compiles the template <strong>first</strong>, then plugs in the values as plain data. Even characters like <code>'</code>, <code>--</code>, or <code>OR 1=1</code> are treated as part of the username string — they can never become SQL code.</p>
+      <p>The database compiles the template <strong>first</strong>, then plugs in the values as plain data. Characters like <code>'</code>, <code>--</code>, <code>UNION</code>, or <code>;</code> are treated as part of the username string — they can never become SQL.</p>
       ${looksLikeAttack
-        ? `<p>🛡️ Your input looked like an injection attempt (<code>${escapeHtml(u.value)}</code>), but here it was just compared literally against the <code>username</code> column. No row matched, so login failed — exactly as it should.</p>`
+        ? `<p>🛡️ Your input looked like an injection attempt, but here it was compared literally against the <code>username</code> column. No row matched, so login failed — exactly as it should.</p>`
         : (data.success
-            ? `<p>✅ Your input matched a real user, so login succeeded normally. Parameterization doesn't block legitimate logins — it just removes the attacker's ability to inject SQL.</p>`
-            : `<p>The credentials simply didn't match any user. Parameterization didn't reject it — the data did.</p>`)
-      }
-      <p class="hint">👉 Now flip back to <strong>🔥 Vulnerable</strong> and try the same input — same payload, very different outcome.</p>
+            ? `<p>✅ Your input matched a real user, so login succeeded normally.</p>`
+            : `<p>The credentials simply didn't match any user.</p>`)}
+      <p class="hint">👉 Flip back to <strong>🔥 Vulnerable</strong> and try the same input — same payload, very different outcome.</p>
     `;
-  } else {
-    if (data.success && data.user.role === 'admin') {
-      explainBody.innerHTML = `
-        <p><strong>The app built one big SQL string by concatenating your input.</strong> Your <code>--</code> turned the password check into a comment, so the database only saw:</p>
-        <pre class="bad">SELECT ... WHERE username = 'admin'</pre>
-        <p>That matched the admin row → attacker is in. No password needed. 💥</p>
-        <p class="hint">👉 Switch to <strong>✅ Safe (parameterized)</strong> and try the same payload to see it neutralized.</p>
-      `;
-    } else if (data.success) {
-      explainBody.innerHTML = `<p>Normal login — the SQL string happened to match a real user. Try an injection payload (the purple buttons) to see how the same code can be abused.</p>`;
-    } else {
-      explainBody.innerHTML = `<p>This payload didn't match a row. Tip: <code>AND</code> binds tighter than <code>OR</code>, so attackers usually end with <code>--</code> to comment out the password check. Try <code>admin' --</code>.</p>`;
-    }
   }
 
-  document.getElementById('jsonOut').textContent = JSON.stringify(data, null, 2);
-});
+  // vulnerable mode
+  if (looksLikeUnion && data.rows.length > 1) {
+    return `
+      <p><strong>UNION-based data exfiltration.</strong> The attacker appended a second SELECT to your query. SQLite happily returned <em>both</em> result sets glued together:</p>
+      <pre class="bad">SELECT id, username, role, secret FROM users WHERE username = ''
+UNION SELECT id, username, <strong>password</strong>, secret FROM users -- ...</pre>
+      <p>Look at the <strong>username column</strong> in the rows above — those are everyone's real passwords. Login bypass is the friendly intro; <strong>this</strong> is what attackers actually do: read arbitrary data, bypass row-level checks, dump tables.</p>
+      <p class="hint">👉 Switch to <strong>✅ Safe</strong> and try the same payload — the entire string is treated as a literal username.</p>
+    `;
+  }
+
+  if (looksLikeStacked) {
+    return `
+      <p><strong>Stacked-query injection.</strong> The attacker used <code>;</code> to terminate your SELECT and run a <em>second</em> statement — an <code>UPDATE</code> in this case.</p>
+      <p>Look at the <strong>Current state of the users table</strong> below — admin's password just changed to <code>pwn3d</code>. This is data tampering: no login required, no audit trail in your app.</p>
+      <p class="hint">⚠️ Some DB drivers (e.g. <code>better-sqlite3</code>, libpq's simple-query) reject multi-statement input by default — but you can never count on it. <code>sql.js</code>, MySQL's <code>multi=true</code>, and many ORMs <em>do</em> allow it. Parameterization is the only durable fix. Click <strong>Reset demo</strong> to restore.</p>
+    `;
+  }
+
+  if (data.success && data.user && data.user.role === 'admin') {
+    return `
+      <p><strong>The app built one big SQL string by concatenating your input.</strong> Your <code>--</code> turned the password check into a comment, so the database only saw:</p>
+      <pre class="bad">SELECT ... WHERE username = 'admin'</pre>
+      <p>That matched the admin row → attacker is in. No password needed. 💥</p>
+      <p class="hint">👉 Switch to <strong>✅ Safe (parameterized)</strong> and try the same payload to see it neutralized.</p>
+    `;
+  }
+
+  if (data.success) {
+    return `<p>Normal login — the SQL string happened to match a real user. Try an injection payload (the purple buttons) to see how the same code can be abused.</p>`;
+  }
+
+  return `<p>This payload didn't match a row. Tip: <code>AND</code> binds tighter than <code>OR</code>, so attackers usually end with <code>--</code> to comment out the password check. Try <code>admin' --</code>.</p>`;
+}
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({

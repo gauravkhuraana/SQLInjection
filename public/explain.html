@@ -54,7 +54,25 @@ WHERE username = '' OR '1'='1' --' AND password = 'anything';</pre>
     </section>
 
     <section class="card">
-      <h2>3. Why it works — the mental model</h2>
+      <h2>3. It's not just login bypass — attackers read &amp; tamper with data</h2>
+      <p>Auth bypass is the easy demo. In the real world, attackers do far more once they can inject SQL:</p>
+
+      <h3>📤 UNION-based exfiltration (read anything)</h3>
+      <p>Append a second <code>SELECT</code> to the original query and stitch its rows in:</p>
+      <pre class="bad">' UNION SELECT id, username, password, secret FROM users --</pre>
+      <p>The "username" column in the response now contains every user's password. Same trick works to read <code>information_schema</code>, other tables, secrets — anything the DB account can see.</p>
+
+      <h3>🔧 Stacked-query tampering (change anything)</h3>
+      <p>If the driver allows multiple statements per call, <code>;</code> ends your query and opens a new one:</p>
+      <pre class="bad">'; UPDATE users SET password='pwn3d' WHERE username='admin'; --</pre>
+      <p>No login required — and your application logs show only the original SELECT. Drivers like <code>better-sqlite3</code> or <code>libpq</code>'s simple-query interface reject this, but <code>sql.js</code>, MySQL's <code>multi=true</code>, and many ORM raw-query helpers don't. Never rely on the driver — fix it at the query.</p>
+
+      <h3>⏱️ Blind &amp; time-based</h3>
+      <p>Even when the app returns no data, attackers can ask "is the first letter of admin's password <code>a</code>?" using a <code>CASE</code> + <code>sleep()</code> trick, and read the response time. No errors, no rows leaked — just patience.</p>
+    </section>
+
+    <section class="card">
+      <h2>4. Why it works — the mental model</h2>
       <div class="split">
         <div>
           <h3>❌ Concatenation</h3>
@@ -73,14 +91,17 @@ params: [input1, input2]</pre>
     </section>
 
     <section class="card">
-      <h2>4. Defense checklist</h2>
+      <h2>5. Defense checklist</h2>
       <ul class="check">
-        <li>✅ Use <strong>parameterized queries</strong> / prepared statements (always).</li>
-        <li>✅ Use an ORM that parameterizes by default.</li>
-        <li>✅ Apply <strong>least privilege</strong> on the DB account.</li>
-        <li>✅ Validate &amp; allow-list input where it makes sense.</li>
+        <li>✅ Use <strong>parameterized queries</strong> / prepared statements — always, even for "trusted" input.</li>
+        <li>✅ Use an ORM that parameterizes by default. Audit any raw-SQL escape hatches.</li>
+        <li>✅ <strong>Hash passwords</strong> with <code>bcrypt</code>, <code>argon2</code>, or <code>scrypt</code> — never store plaintext (this demo does, deliberately, so you can see them leak). Even a perfect parameterized query won't save you if an attacker ever <em>does</em> get a dump.</li>
+        <li>✅ Apply <strong>least privilege</strong> on the DB account — the web app's user should not be able to <code>DROP</code>, alter schema, or read tables it doesn't need.</li>
+        <li>✅ Disable multi-statement support in the DB driver when you don't need it (e.g. MySQL <code>multipleStatements: false</code>).</li>
+        <li>✅ Validate &amp; allow-list input where it makes sense (e.g. enum values, numeric IDs) — as defense-in-depth, not a substitute.</li>
         <li>✅ Add a <strong>WAF</strong> as defense-in-depth — but never as the only defense.</li>
-        <li>❌ Don't try to "escape" or blacklist characters yourself.</li>
+        <li>✅ Log &amp; alert on query errors and unusual row counts — UNION attacks often produce telltale spikes.</li>
+        <li>❌ Don't try to "escape" or blacklist characters yourself. You will miss one.</li>
       </ul>
     </section>
 

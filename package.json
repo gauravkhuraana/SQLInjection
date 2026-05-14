@@ -1,13 +1,12 @@
 {
   "name": "sql-injection-demo",
-  "version": "1.0.0",
-  "description": "A tiny web app to demo SQL Injection in 1-2 minutes during a presentation.",
-  "main": "server.js",
+  "version": "1.1.0",
+  "description": "A tiny static web app to demo SQL Injection (and its fix) in 1-2 minutes during a presentation. Runs entirely in the browser via sql.js.",
+  "private": true,
   "scripts": {
-    "start": "node server.js"
+    "start": "npx --yes http-server public -c-1 -p 3000",
+    "serve": "npx --yes http-server public -c-1 -p 3000"
   },
-  "dependencies": {
-    "better-sqlite3": "^11.3.0",
-    "express": "^4.19.2"
-  }
+  "keywords": ["sql-injection", "security", "demo", "education", "sqli"],
+  "license": "MIT"
 }

@@ -58,7 +58,38 @@ button:hover { background: #1d4ed8; }
 .payloads { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #334155; }
 .payloads button { background: #7c3aed; margin: .25rem .35rem .25rem 0; }
 .payloads button:hover { background: #6d28d9; }
+.payloads button.danger { background: #b91c1c; }
+.payloads button.danger:hover { background: #991b1b; }
 .payloads code { background: #0f172a; padding: .1rem .35rem; border-radius: 4px; }
+
+.form-buttons { display: flex; gap: .6rem; flex-wrap: wrap; }
+button.secondary {
+  background: #334155; color: #e2e8f0;
+}
+button.secondary:hover { background: #475569; }
+button.small { padding: .3rem .6rem; font-size: .85rem; }
+
+.sql-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .6rem; margin-top: 1rem;
+}
+.sql-header h3 { margin: 0; }
+
+.data-table {
+  width: 100%; border-collapse: collapse; margin: .5rem 0 .25rem;
+  font-size: .9rem;
+}
+.data-table th, .data-table td {
+  border: 1px solid #334155; padding: .4rem .6rem; text-align: left;
+  vertical-align: top;
+}
+.data-table th { background: #0b1220; color: #cbd5e1; }
+.data-table td { background: #0f172a; color: #e2e8f0; font-family: ui-monospace, Consolas, monospace; }
+.data-table tr:hover td { background: #1e293b; }
+
+details { margin-top: 1rem; }
+details summary { cursor: pointer; color: #93c5fd; padding: .25rem 0; }
+.fail-text { color: #fca5a5; }
 
 pre {
   background: #0b1220; border: 1px solid #334155; padding: .85rem 1rem;
@@ -86,6 +117,13 @@ pre.bad  { border-left: 4px solid #ef4444; }
 #status.fail  {
   background: #450a0a; color: #fecaca;
   border: 1px solid #ef4444;
+}
+#status.breach {
+  background: linear-gradient(90deg, #7f1d1d, #b91c1c);
+  color: #fee2e2;
+  border: 2px solid #ef4444;
+  box-shadow: 0 0 0 3px rgba(239,68,68,.25);
+  animation: pulse 1.2s ease-in-out infinite;
 }
 
 .diagram {
